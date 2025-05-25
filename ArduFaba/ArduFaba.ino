@@ -14,7 +14,7 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 SerialMP3Player mp3(MP3_RX, MP3_TX);
 
 // UID noti
-byte tag1_UID[4] = {0x36, 0x1F, 0xD0, 0xB4}; // Brano 1
+byte tag1_UID[4] = {0xE3, 0xDA, 0x68, 0x3}; // Brano 1
 byte tag2_UID[4] = {0x12, 0x34, 0x56, 0x78}; // Brano 2
 
 bool isPlaying = false;
@@ -58,7 +58,9 @@ void loop() {
         int detectedTrack = getTrackFromUID(mfrc522.uid.uidByte);
         if (detectedTrack == currentTrack) {
           Serial.println("Stesso tag ancora presente → Riparte il brano.");
+          mp3.setVol(30);
           mp3.play(currentTrack);
+          delay(5000);
           isPlaying = true;
         }
       }
@@ -92,7 +94,7 @@ void loop() {
 int getTrackFromUID(byte *uid) {
   if (compareUID(uid, tag1_UID)) return 1;
   if (compareUID(uid, tag2_UID)) return 2;
-  return 0;0
+  return 0;
 }
 
 // Confronta due UID (4 byte)
