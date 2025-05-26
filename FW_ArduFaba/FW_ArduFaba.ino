@@ -82,7 +82,11 @@ void loop() {
   }
 
   // Normale lettura tag RFID per cambiare brano
-  if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+  if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) 
+  {
+    byte uid[4];
+    memcpy(uid, mfrc522.uid.uidByte, 4);
+
     Serial.print("UID letto: ");
     for (byte i = 0; i < mfrc522.uid.size; i++) {
       Serial.print(mfrc522.uid.uidByte[i], HEX);
@@ -90,7 +94,23 @@ void loop() {
     }
     Serial.println();
 
-    int trackToPlay = getTrackFromUID(mfrc522.uid.uidByte);
+    int id = findTag(uid);
+    if (id > 0) {
+      Serial.print("Tag riconosciuto, ID: ");
+      Serial.println(id);
+    } else {
+      id = registerNewTag(uid);
+      if (id > 0) {
+        Serial.print("Nuovo tag registrato, ID: ");
+        Serial.println(id);
+      } else {
+        Serial.println("Memoria piena o errore");
+      }
+    }
+
+    mfrc522.PICC_HaltA();
+
+    int trackToPlay = id;
 
     if (trackToPlay > 0) {
       Serial.print("Tag riconosciuto → Play brano ");
@@ -101,7 +121,9 @@ void loop() {
     } else {
       Serial.println("Tag non riconosciuto → nessuna azione.");
     }
+
   }
+
 }
 
 // Funzione: restituisce il numero brano in base all'UID letto
