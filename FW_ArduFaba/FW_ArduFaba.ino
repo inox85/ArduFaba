@@ -81,7 +81,7 @@ void loop() {
 
   }
 
-  // Normale lettura tag RFID per cambiare brano
+
   if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) 
   {
     byte uid[4];
