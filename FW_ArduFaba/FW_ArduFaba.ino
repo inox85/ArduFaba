@@ -31,6 +31,17 @@ int currentTrack = 0;
 
 void setup() {
   Serial.begin(9600);
+
+
+  // Serial.println("Cancellazione EEPROM...");
+
+  // for (int i = 0; i < EEPROM.length(); i++) {
+  //   EEPROM.write(i, 0xFF);  // oppure 0x00 se preferisci
+  // }
+
+  // Serial.println("EEPROM cancellata.");
+
+
   SPI.begin();
   mfrc522.PCD_Init();
 
@@ -41,13 +52,11 @@ void setup() {
   mp3.sendCommand(CMD_SEL_DEV, 0, 2); // seleziona SD card
   delay(500);
 
-  playFileInFolder(1, 1);
-
-  delay(5000);
-
   mp3.setVol(30); // Volume 50%
 
   Serial.println("Sistema pronto. Avvicina un tag RFID.");
+
+  playFileInFolder(1, 1);
 }
 
 void loop() {
@@ -81,7 +90,7 @@ void loop() {
 
   }
 
-
+  // Normale lettura tag RFID per cambiare brano
   if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) 
   {
     byte uid[4];
@@ -93,20 +102,8 @@ void loop() {
       Serial.print(" ");
     }
     Serial.println();
-
-    int id = findTag(uid);
-    if (id > 0) {
-      Serial.print("Tag riconosciuto, ID: ");
-      Serial.println(id);
-    } else {
-      id = registerNewTag(uid);
-      if (id > 0) {
-        Serial.print("Nuovo tag registrato, ID: ");
-        Serial.println(id);
-      } else {
-        Serial.println("Memoria piena o errore");
-      }
-    }
+    
+    int id = trovaOScriviUIDinEEPROM(uid);
 
     mfrc522.PICC_HaltA();
 
@@ -125,6 +122,51 @@ void loop() {
   }
 
 }
+
+uint8_t trovaOScriviUIDinEEPROM(const byte* uid) {
+  int primoSlotLibero = -1;
+
+  for (uint8_t blocco = 0; blocco < 100; blocco++) {
+    int addr = blocco * 4;
+    bool match = true;
+    bool slotVuoto = true;
+
+    // Verifica se i 4 byte del blocco coincidono con l'UID
+    for (uint8_t i = 0; i < 4; i++) {
+      byte val = EEPROM.read(addr + i);
+
+      if (val != uid[i]) {
+        match = false;
+      }
+
+      if (val != 0xFF) {
+        slotVuoto = false;
+      }
+    }
+
+    if (match) {
+      return blocco + 1; // UID già presente
+    }
+
+    // Segna il primo slot vuoto disponibile
+    if (slotVuoto && primoSlotLibero == -1) {
+      primoSlotLibero = blocco;
+    }
+  }
+
+  // Se UID non trovato ma c'è uno slot libero, scrivilo lì
+  if (primoSlotLibero != -1) {
+    int addr = primoSlotLibero * 4;
+    for (uint8_t i = 0; i < 4; i++) {
+      EEPROM.write(addr + i, uid[i]);
+    }
+    return primoSlotLibero + 1;
+  }
+
+  // EEPROM piena
+  return 0;
+}
+
 
 // Funzione: restituisce il numero brano in base all'UID letto
 int getTrackFromUID(byte *uid) {
@@ -147,32 +189,6 @@ void playFileInFolder(uint8_t folder, uint8_t file) {
   {
     mp3.sendCommand(0x0F, folder, file);
   }
+
 }
 
-int findTag(byte* uid) {
-  int count = EEPROM.read(COUNT_ADDR);
-  for (int i = 0; i < count; i++) {
-    int base = DATA_START_ADDR + i * TAG_SIZE;
-    bool match = true;
-    for (int j = 0; j < TAG_SIZE; j++) {
-      if (EEPROM.read(base + j) != uid[j]) {
-        match = false;
-        break;
-      }
-    }
-    if (match) return i + 1; // mappa da 1 a 100
-  }
-  return 0; // non trovato
-}
-
-int registerNewTag(byte* uid) {
-  int count = EEPROM.read(COUNT_ADDR);
-  if (count >= MAX_TAGS) return -1; // memoria piena
-
-  int base = DATA_START_ADDR + count * TAG_SIZE;
-  for (int j = 0; j < TAG_SIZE; j++) {
-    EEPROM.write(base + j, uid[j]);
-  }
-  EEPROM.write(COUNT_ADDR, count + 1);
-  return count + 1; // ID assegnato da 1 a 100
-}
