@@ -51,98 +51,58 @@ void setup() {
 }
 
 void loop() {
-  // Controllo risposte MP3 (fine traccia)
-  if (mp3.available()) {
-    String answer = mp3.decodeMP3Answer();
-    Serial.println("MP3 risponde: " + answer);
 
-    if (answer.indexOf("track finished") >= 0) {
-      isPlaying = false;
-
-      // Dopo fine brano → verifica se il tag è ancora lì
-      if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-        Serial.print("UID presente: ");
-        for (byte i = 0; i < mfrc522.uid.size; i++) {
-          Serial.print(mfrc522.uid.uidByte[i], HEX);
-          Serial.print(" ");
-        }
-        Serial.println();
-
-        int detectedTrack = getTrackFromUID(mfrc522.uid.uidByte);
-        if (detectedTrack == currentTrack) {
-          Serial.println("Stesso tag ancora presente → Riparte il brano.");
-          mp3.setVol(30);
-          mp3.play(currentTrack);
-          delay(5000);
-          isPlaying = true;
-        }
-      }
-    }
-
-  }
-
-  // Normale lettura tag RFID per cambiare brano
-  if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) 
+  if(mp3.available())
   {
-    byte uid[4];
-    memcpy(uid, mfrc522.uid.uidByte, 4);
+    // Normale lettura tag RFID per cambiare brano
+    if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) 
+    {
+      byte uid[4];
+      memcpy(uid, mfrc522.uid.uidByte, 4);
 
-    Serial.print("UID letto: ");
-    for (byte i = 0; i < mfrc522.uid.size; i++) {
-      Serial.print(mfrc522.uid.uidByte[i], HEX);
-      Serial.print(" ");
-    }
-    Serial.println();
+      Serial.print("UID letto: ");
+      for (byte i = 0; i < mfrc522.uid.size; i++) {
+        Serial.print(mfrc522.uid.uidByte[i], HEX);
+        Serial.print(" ");
+      }
+      Serial.println();
 
-    int id = findTag(uid);
-    if (id > 0) {
-      Serial.print("Tag riconosciuto, ID: ");
-      Serial.println(id);
-    } else {
-      id = registerNewTag(uid);
+      int id = findTag(uid);
       if (id > 0) {
-        Serial.print("Nuovo tag registrato, ID: ");
+        Serial.print("Tag riconosciuto, ID: ");
         Serial.println(id);
       } else {
-        Serial.println("Memoria piena o errore");
+        id = registerNewTag(uid);
+        if (id > 0) {
+          Serial.print("Nuovo tag registrato, ID: ");
+          Serial.println(id);
+        } else {
+          Serial.println("Memoria piena o errore");
+        }
       }
-    }
 
-    mfrc522.PICC_HaltA();
+      mfrc522.PICC_HaltA();
 
-    int trackToPlay = id;
+      int trackToPlay = id;
 
-    if (trackToPlay > 0) {
-      Serial.print("Tag riconosciuto → Play brano ");
-      Serial.println(trackToPlay);
-      mp3.play(trackToPlay);
-      isPlaying = true;
-      currentTrack = trackToPlay;
-    } else {
-      Serial.println("Tag non riconosciuto → nessuna azione.");
+      if (trackToPlay > 0) {
+        Serial.print("Tag riconosciuto → Play brano ");
+        Serial.println(trackToPlay);
+        mp3.play(trackToPlay);
+        isPlaying = true;
+        currentTrack = trackToPlay;
+      } else {
+        Serial.println("Tag non riconosciuto → nessuna azione.");
+      }
+
     }
 
   }
 
 }
 
-// Funzione: restituisce il numero brano in base all'UID letto
-int getTrackFromUID(byte *uid) {
-  if (compareUID(uid, tag1_UID)) return 1;
-  if (compareUID(uid, tag2_UID)) return 2;
-  return 0;
-}
-
-// Confronta due UID (4 byte)
-bool compareUID(byte *uid1, byte *uid2) {
-  for (byte i = 0; i < 4; i++) {
-    if (uid1[i] != uid2[i]) return false;
-  }
-  return true;
-}
-
-void playFileInFolder(uint8_t folder, uint8_t file) {
-  
+void playFileInFolder(uint8_t folder, uint8_t file) 
+{ 
   if (mp3.available()) 
   {
     mp3.sendCommand(0x0F, folder, file);
