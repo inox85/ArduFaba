@@ -4,6 +4,10 @@
 #include "Button2.h"
 #include "EEPROM.h"
 
+
+#define GREEN_BUTTON_PIN 7
+#define RED_BUTTON_PIN 8
+
 // Pin MFRC522
 #define RST_PIN  9
 #define SS_PIN   10
@@ -11,6 +15,15 @@
 // Pin MP3 Player YX5300 (TX modulo → pin 4, RX modulo → pin 5)
 #define MP3_TX 4
 #define MP3_RX 5
+
+#define MISC_FOLDER 1
+
+#define POWER_UP_TRACK 1
+#define RECOGNIZED_CHARACTER_TRACK 2
+#define BATTERY_ALERT_TRACK 3
+#define NEW_CHARACTER_TRACK 4
+#define DELETE_MEMORY_TRACK 5
+#define MEMORY_ERROR_TRACK 6
 
 const int MAX_TAGS = 100;
 const int TAG_SIZE = 4;
@@ -20,16 +33,15 @@ const int DATA_START_ADDR = 1;
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 SerialMP3Player mp3(MP3_RX, MP3_TX);
 
-// UID noti
-byte tag1_UID[4] = {0xE3, 0xDA, 0x68, 0x3}; // Brano 1
-byte tag2_UID[4] = {0x12, 0x34, 0x56, 0x78}; // Brano 2
 
 bool isPlaying = false;
 int currentTrack = 0;
 
+Button2 redButton(GREEN_BUTTON_PIN);
+Button2 greenButton(RED_BUTTON_PIN);
 
-
-void setup() {
+void setup() 
+{
   Serial.begin(9600);
   SPI.begin();
   mfrc522.PCD_Init();
@@ -41,7 +53,7 @@ void setup() {
   mp3.sendCommand(CMD_SEL_DEV, 0, 2); // seleziona SD card
   delay(500);
 
-  playFileInFolder(1, 1);
+  playFileInFolder(MISC_FOLDER, POWER_UP_TRACK);
 
   delay(5000);
 
@@ -61,37 +73,57 @@ void loop() {
       memcpy(uid, mfrc522.uid.uidByte, 4);
 
       Serial.print("UID letto: ");
+      
       for (byte i = 0; i < mfrc522.uid.size; i++) {
         Serial.print(mfrc522.uid.uidByte[i], HEX);
         Serial.print(" ");
       }
+      
       Serial.println();
 
       int id = findTag(uid);
-      if (id > 0) {
+      
+      if (id > 0) 
+      {
         Serial.print("Tag riconosciuto, ID: ");
         Serial.println(id);
-      } else {
+        playFileInFolder(MISC_FOLDER, RECOGNIZED_CHARACTER_TRACK);
+      } 
+      else 
+      {
+      
         id = registerNewTag(uid);
-        if (id > 0) {
+        if (id > 0) 
+        {
           Serial.print("Nuovo tag registrato, ID: ");
           Serial.println(id);
-        } else {
+          playFileInFolder(MISC_FOLDER, NEW_CHARACTER_TRACK);
+        } 
+        else 
+        {
           Serial.println("Memoria piena o errore");
+          playFileInFolder(MISC_FOLDER, MEMORY_ERROR_TRACK);
         }
+      
       }
 
       mfrc522.PICC_HaltA();
-
+      
       int trackToPlay = id;
 
-      if (trackToPlay > 0) {
-        Serial.print("Tag riconosciuto → Play brano ");
-        Serial.println(trackToPlay);
-        mp3.play(trackToPlay);
-        isPlaying = true;
-        currentTrack = trackToPlay;
-      } else {
+      if (trackToPlay > 0) 
+      {
+        if(trackToPlay != currentTrack)
+        {
+          Serial.print("Tag riconosciuto → Play brano ");
+          Serial.println(trackToPlay);
+          mp3.play(trackToPlay);
+          isPlaying = true;
+          currentTrack = trackToPlay;
+        }
+      }
+      else
+      {
         Serial.println("Tag non riconosciuto → nessuna azione.");
       }
 
