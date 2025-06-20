@@ -25,6 +25,10 @@
 #define DELETE_MEMORY_TRACK 5
 #define MEMORY_ERROR_TRACK 6
 
+#define DEBOUNCE_TIME 50
+#define DOUBLE_CLICK_TIME 400
+#define LONG_PRESS_TIME 1000
+
 const int MAX_TAGS = 100;
 const int TAG_SIZE = 4;
 const int COUNT_ADDR = 0;
@@ -39,7 +43,6 @@ int currentTrack = 0;
 
 Button2 redButton(GREEN_BUTTON_PIN);
 Button2 greenButton(RED_BUTTON_PIN);
-
 
 // Funzione richiamata al singolo click
 void redButtonSingleClick(Button2& btn) {
@@ -100,9 +103,17 @@ void setup()
   redButton.setDoubleClickHandler(redButtonDoubleClick);
   redButton.setLongClickHandler(redButtonLongClick);
 
+  redButton.setDebounceTime(DEBOUNCE_TIME);         // default: 50 ms
+  redButton.setClickTimeout(DOUBLE_CLICK_TIME);        // massimo tempo tra click per doppio click
+  redButton.setLongClickTime(LONG_PRESS_TIME);      // tempo per riconoscere long click
+
   greenButton.setClickHandler(greenButtonSingleClick);
   greenButton.setDoubleClickHandler(greenButtonDoubleClick);
   greenButton.setLongClickHandler(greenButtonLongClick);
+
+  greenButton.setDebounceTime(DEBOUNCE_TIME);         // default: 50 ms
+  greenButton.setClickTimeout(DOUBLE_CLICK_TIME);        // massimo tempo tra click per doppio click
+  greenButton.setLongClickTime(LONG_PRESS_TIME);      // tempo per riconoscere long click
   
 
 
