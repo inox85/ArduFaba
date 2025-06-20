@@ -40,6 +40,37 @@ int currentTrack = 0;
 Button2 redButton(GREEN_BUTTON_PIN);
 Button2 greenButton(RED_BUTTON_PIN);
 
+
+// Funzione richiamata al singolo click
+void redButtonSingleClick(Button2& btn) {
+  Serial.println("Click singolo!");
+}
+
+// Funzione richiamata al doppio click
+void redButtonDoubleClick(Button2& btn) {
+  Serial.println("Doppio click!");
+}
+
+// Funzione richiamata alla pressione lunga
+void redButtonLongClick(Button2& btn) {
+  Serial.println("Pressione lunga!");
+}
+
+void greenButtonSingleClick
+(Button2& btn) {
+  Serial.println("Click singolo!");
+}
+
+// Funzione richiamata al doppio click
+void greenButtonDoubleClick(Button2& btn) {
+  Serial.println("Doppio click!");
+}
+
+// Funzione richiamata alla pressione lunga
+void greenButtonLongClick(Button2& btn) {
+  Serial.println("Pressione lunga!");
+}
+
 void setup() 
 {
   Serial.begin(9600);
@@ -53,13 +84,44 @@ void setup()
   mp3.sendCommand(CMD_SEL_DEV, 0, 2); // seleziona SD card
   delay(500);
 
+  mp3.setVol(30); // Volume 50%
+
+  pinMode(RED_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(GREEN_BUTTON_PIN, INPUT_PULLUP);
+
+  if(!digitalRead(RED_BUTTON_PIN) && !digitalRead(GREEN_BUTTON_PIN))
+  {
+    Serial.println("Richiesta conferma cancellazione EEPROM");
+  }
+
+  Serial.println("Inizializzazione Bottoni...");
+  // Definiamo i gestori degli eventi
+  redButton.setClickHandler(redButtonSingleClick);
+  redButton.setDoubleClickHandler(redButtonDoubleClick);
+  redButton.setLongClickHandler(redButtonLongClick);
+
+  greenButton.setClickHandler(greenButtonSingleClick);
+  greenButton.setDoubleClickHandler(greenButtonDoubleClick);
+  greenButton.setLongClickHandler(greenButtonLongClick);
+  
+
+
   playFileInFolder(MISC_FOLDER, POWER_UP_TRACK);
 
   delay(5000);
 
-  mp3.setVol(30); // Volume 50%
-
   Serial.println("Sistema pronto. Avvicina un tag RFID.");
+}
+
+void eraseEEPROM()
+{
+  Serial.println("Cancellazione EEPROM in corso...");
+
+  for (int i = 0; i < EEPROM.length(); i++) {
+    EEPROM.write(i, 0); // scrive 0 in ogni cella
+  }
+
+  Serial.println("EEPROM cancellata.");
 }
 
 void loop() {
@@ -67,14 +129,16 @@ void loop() {
   if(mp3.available())
   {
     // Normale lettura tag RFID per cambiare brano
-    if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) 
+    if(mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) 
     {
+
       byte uid[4];
       memcpy(uid, mfrc522.uid.uidByte, 4);
 
       Serial.print("UID letto: ");
       
-      for (byte i = 0; i < mfrc522.uid.size; i++) {
+      for (byte i = 0; i < mfrc522.uid.size; i++)
+      {
         Serial.print(mfrc522.uid.uidByte[i], HEX);
         Serial.print(" ");
       }
@@ -88,7 +152,7 @@ void loop() {
         Serial.print("Tag riconosciuto, ID: ");
         Serial.println(id);
         playFileInFolder(MISC_FOLDER, RECOGNIZED_CHARACTER_TRACK);
-      } 
+      }
       else 
       {
       
@@ -108,19 +172,19 @@ void loop() {
       }
 
       mfrc522.PICC_HaltA();
-      
-      int trackToPlay = id;
 
-      if (trackToPlay > 0) 
+      if (id > 0) 
       {
-        if(trackToPlay != currentTrack)
+
+        if(id != currentTrack)
         {
           Serial.print("Tag riconosciuto → Play brano ");
-          Serial.println(trackToPlay);
-          mp3.play(trackToPlay);
+          Serial.println(id);
+          mp3.play(id);
           isPlaying = true;
-          currentTrack = trackToPlay;
+          currentTrack = id;
         }
+
       }
       else
       {
@@ -168,3 +232,4 @@ int registerNewTag(byte* uid) {
   EEPROM.write(COUNT_ADDR, count + 1);
   return count + 1; // ID assegnato da 1 a 100
 }
+
