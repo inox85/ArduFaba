@@ -41,8 +41,18 @@ SerialMP3Player mp3(MP3_RX, MP3_TX);
 bool isPlaying = false;
 int currentTrack = 0;
 
+
 Button2 redButton(GREEN_BUTTON_PIN);
 Button2 greenButton(RED_BUTTON_PIN);
+
+
+void mp3Callback(uint8_t cmd, uint16_t param) {
+  if (cmd == 0x3D) {
+    // Comando 0x3D = Fine traccia
+    trackFinished = true;
+  }
+}
+
 
 // Funzione richiamata al singolo click
 void redButtonSingleClick(Button2& btn) {
@@ -81,8 +91,10 @@ void setup()
   mfrc522.PCD_Init();
 
   Serial.println("Inizializzazione MP3 Player...");
+
   mp3.showDebug(1);
   mp3.begin(9600);
+  mp3.setCallback(mp3Callback); // Imposta la callback
   delay(500);
   mp3.sendCommand(CMD_SEL_DEV, 0, 2); // seleziona SD card
   delay(500);
@@ -98,30 +110,24 @@ void setup()
   }
 
   Serial.println("Inizializzazione Bottoni...");
+
   // Definiamo i gestori degli eventi
   redButton.setClickHandler(redButtonSingleClick);
   redButton.setDoubleClickHandler(redButtonDoubleClick);
   redButton.setLongClickHandler(redButtonLongClick);
 
-  redButton.setDebounceTime(DEBOUNCE_TIME);         // default: 50 ms
-  redButton.setClickTimeout(DOUBLE_CLICK_TIME);        // massimo tempo tra click per doppio click
-  redButton.setLongClickTime(LONG_PRESS_TIME);      // tempo per riconoscere long click
 
   greenButton.setClickHandler(greenButtonSingleClick);
   greenButton.setDoubleClickHandler(greenButtonDoubleClick);
   greenButton.setLongClickHandler(greenButtonLongClick);
 
-  greenButton.setDebounceTime(DEBOUNCE_TIME);         // default: 50 ms
-  greenButton.setClickTimeout(DOUBLE_CLICK_TIME);        // massimo tempo tra click per doppio click
-  greenButton.setLongClickTime(LONG_PRESS_TIME);      // tempo per riconoscere long click
   
-
-
   playFileInFolder(MISC_FOLDER, POWER_UP_TRACK);
 
   delay(5000);
 
   Serial.println("Sistema pronto. Avvicina un tag RFID.");
+
 }
 
 void eraseEEPROM()
@@ -186,7 +192,6 @@ void loop() {
 
       if (id > 0) 
       {
-
         if(id != currentTrack)
         {
           Serial.print("Tag riconosciuto → Play brano ");
@@ -195,26 +200,36 @@ void loop() {
           isPlaying = true;
           currentTrack = id;
         }
-
       }
       else
       {
         Serial.println("Tag non riconosciuto → nessuna azione.");
       }
-
     }
-
   }
 
 }
+
+// void playFileInFolder(uint8_t folder, uint8_t file) 
+// { 
+//   if (mp3.available()) 
+//   {
+//     mp3.sendCommand(0x0F, folder, file);
+//   }
+// }
 
 void playFileInFolder(uint8_t folder, uint8_t file) 
 { 
-  if (mp3.available()) 
-  {
-    mp3.sendCommand(0x0F, folder, file);
+  trackFinished = false;  // Reset flag
+  mp3.sendCommand(0x0F, folder, file);  // Play file da cartella
+
+  // Attendi la fine del brano
+  while (!trackFinished) {
+    mp3.loop();  // Necessario per processare i messaggi in arrivo
+    delay(10);   // Non blocca troppo
   }
 }
+
 
 int findTag(byte* uid) {
   int count = EEPROM.read(COUNT_ADDR);
