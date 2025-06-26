@@ -49,29 +49,28 @@ void redButtonHandler(Button2& btn) {
         case single_click:
             break;
         case double_click:
-            Serial.print("double ");
+            playNextTrack();
             break;
         case triple_click:
             Serial.print("triple ");
             break;
         case long_click:
-            Serial.print("long");
+            Serial.print("long ");
             break;
           case empty:
             return;
     }
-    Serial.print("click");
-    Serial.print(" (");
-    Serial.print(btn.getNumberOfClicks());    
-    Serial.println(")");
+
 }
+
 
 void greenButtonHandler(Button2& btn) {
     switch (btn.getType()) {
         case single_click:
+            playPause();
             break;
         case double_click:
-            Serial.print("double ");
+            playPreviousTrack();
             break;
         case triple_click:
             Serial.print("triple ");
@@ -82,10 +81,58 @@ void greenButtonHandler(Button2& btn) {
           case empty:
             return;
     }
-    Serial.print("click");
-    Serial.print(" (");
-    Serial.print(btn.getNumberOfClicks());    
-    Serial.println(")");
+
+}
+
+
+void playPause()
+{
+
+  if(isPlaying)
+  { 
+    isPlaying = false;
+    Serial.println("Selezione manuale → Pause ");
+    mp3.pause(); 
+  }
+  else
+  {
+    if(currentTrack == 0)
+    {
+      currentTrack++;
+      mp3.play(currentTrack);
+    }
+    else
+    {
+      isPlaying = true;
+      Serial.println("Selezione manuale → Play ");
+      mp3.play();
+    }
+  }
+
+}
+
+
+void playNextTrack()
+{
+    if(currentTrack < 100)
+    {
+      currentTrack++;
+      Serial.print("Selezione manuale → Play brano ");
+      Serial.println(currentTrack);
+      mp3.play(currentTrack);
+    }
+}
+
+
+void playPreviousTrack()
+{
+    if(currentTrack >= 1)
+    {
+      currentTrack--;
+      Serial.print("Selezione manuale → Play brano ");
+      Serial.println(currentTrack);
+      mp3.play(currentTrack);
+    }
 }
 
 void setup() 
@@ -108,7 +155,19 @@ void setup()
 
   if(!digitalRead(RED_BUTTON_PIN) && !digitalRead(GREEN_BUTTON_PIN))
   {
-    Serial.println("Richiesta conferma cancellazione EEPROM");
+    playFileInFolder(MISC_FOLDER, DELETE_MEMORY_TRACK, 8000);
+    while(true)
+    {
+        if(!digitalRead(GREEN_BUTTON_PIN))
+        {
+          eraseEEPROM();
+          break;
+        }
+        if(!digitalRead(RED_BUTTON_PIN))
+        {
+          break;
+        }
+    }
   }
 
   Serial.println("Inizializzazione Bottoni...");
@@ -128,7 +187,7 @@ void setup()
   greenButton.setTripleClickHandler(greenButtonHandler);
 
   
-  playFileInFolder(MISC_FOLDER, POWER_UP_TRACK);
+  playFileInFolder(MISC_FOLDER, POWER_UP_TRACK, 5000);
 
   delay(5000);
 
@@ -178,7 +237,7 @@ void loop()
       {
         Serial.print("Tag riconosciuto, ID: ");
         Serial.println(id);
-        playFileInFolder(MISC_FOLDER, RECOGNIZED_CHARACTER_TRACK);
+        playFileInFolder(MISC_FOLDER, RECOGNIZED_CHARACTER_TRACK, 5000);
       }
       else 
       {
@@ -188,12 +247,12 @@ void loop()
         {
           Serial.print("Nuovo tag registrato, ID: ");
           Serial.println(id);
-          playFileInFolder(MISC_FOLDER, NEW_CHARACTER_TRACK);
+          playFileInFolder(MISC_FOLDER, NEW_CHARACTER_TRACK, 5000);
         } 
         else 
         {
           Serial.println("Memoria piena o errore");
-          playFileInFolder(MISC_FOLDER, MEMORY_ERROR_TRACK);
+          playFileInFolder(MISC_FOLDER, MEMORY_ERROR_TRACK, 5000);
         }
       
       }
@@ -203,7 +262,7 @@ void loop()
       if (id > 0) 
       {
         if(id != currentTrack)
-        {
+        {       
           Serial.print("Tag riconosciuto → Play brano ");
           Serial.println(id);
           mp3.play(id);
@@ -221,7 +280,7 @@ void loop()
 }
 
 
-void playFileInFolder(uint8_t folder, uint8_t file) 
+void playFileInFolder(uint8_t folder, uint8_t file, uint16_t wait) 
 { 
   if (mp3.available()) 
   {
@@ -231,8 +290,8 @@ void playFileInFolder(uint8_t folder, uint8_t file)
     Serial.print(folder);
     Serial.print(" File: ");
     Serial.println(file);
-    delay(5000);
-    Serial.print("Fine messaggio");
+    delay(wait);
+    Serial.println("Fine messaggio");
   }
 }
 
