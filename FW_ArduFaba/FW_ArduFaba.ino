@@ -3,7 +3,7 @@
 #include "SerialMP3Player.h"
 #include "Button2.h"
 #include "EEPROM.h"
-
+#include <SoftwareSerial.h>
 
 #define GREEN_BUTTON_PIN 7
 #define RED_BUTTON_PIN 8
@@ -35,43 +35,104 @@ const int COUNT_ADDR = 0;
 const int DATA_START_ADDR = 1;
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
+SoftwareSerial mp3Serial(MP3_RX, MP3_TX);  // RX, TX del modulo MP3
 SerialMP3Player mp3(MP3_RX, MP3_TX);
-
 
 bool isPlaying = false;
 int currentTrack = 0;
 
-Button2 redButton(GREEN_BUTTON_PIN);
-Button2 greenButton(RED_BUTTON_PIN);
+Button2 redButton;
+Button2 greenButton;
 
-// Funzione richiamata al singolo click
-void redButtonSingleClick(Button2& btn) {
-  Serial.println("Click singolo!");
+void redButtonHandler(Button2& btn) {
+    switch (btn.getType()) {
+        case single_click:
+            break;
+        case double_click:
+            playNextTrack();
+            break;
+        case triple_click:
+            Serial.print("triple ");
+            break;
+        case long_click:
+            Serial.print("long ");
+            break;
+          case empty:
+            return;
+    }
+
 }
 
-// Funzione richiamata al doppio click
-void redButtonDoubleClick(Button2& btn) {
-  Serial.println("Doppio click!");
+
+void greenButtonHandler(Button2& btn) {
+    switch (btn.getType()) {
+        case single_click:
+            playPause();
+            break;
+        case double_click:
+            playPreviousTrack();
+            break;
+        case triple_click:
+            Serial.print("triple ");
+            break;
+        case long_click:
+            Serial.print("long");
+            break;
+          case empty:
+            return;
+    }
+
 }
 
-// Funzione richiamata alla pressione lunga
-void redButtonLongClick(Button2& btn) {
-  Serial.println("Pressione lunga!");
+
+void playPause()
+{
+
+  if(isPlaying)
+  { 
+    isPlaying = false;
+    Serial.println("Selezione manuale → Pause ");
+    mp3.pause(); 
+  }
+  else
+  {
+    if(currentTrack == 0)
+    {
+      currentTrack++;
+      mp3.play(currentTrack);
+    }
+    else
+    {
+      isPlaying = true;
+      Serial.println("Selezione manuale → Play ");
+      mp3.play();
+    }
+  }
+
 }
 
-void greenButtonSingleClick
-(Button2& btn) {
-  Serial.println("Click singolo!");
+
+void playNextTrack()
+{
+    if(currentTrack < 100)
+    {
+      currentTrack++;
+      Serial.print("Selezione manuale → Play brano ");
+      Serial.println(currentTrack);
+      mp3.play(currentTrack);
+    }
 }
 
-// Funzione richiamata al doppio click
-void greenButtonDoubleClick(Button2& btn) {
-  Serial.println("Doppio click!");
-}
 
-// Funzione richiamata alla pressione lunga
-void greenButtonLongClick(Button2& btn) {
-  Serial.println("Pressione lunga!");
+void playPreviousTrack()
+{
+    if(currentTrack >= 1)
+    {
+      currentTrack--;
+      Serial.print("Selezione manuale → Play brano ");
+      Serial.println(currentTrack);
+      mp3.play(currentTrack);
+    }
 }
 
 void setup() 
@@ -94,21 +155,39 @@ void setup()
 
   if(!digitalRead(RED_BUTTON_PIN) && !digitalRead(GREEN_BUTTON_PIN))
   {
-    Serial.println("Richiesta conferma cancellazione EEPROM");
+    playFileInFolder(MISC_FOLDER, DELETE_MEMORY_TRACK, 8000);
+    while(true)
+    {
+        if(!digitalRead(GREEN_BUTTON_PIN))
+        {
+          eraseEEPROM();
+          break;
+        }
+        if(!digitalRead(RED_BUTTON_PIN))
+        {
+          break;
+        }
+    }
   }
 
   Serial.println("Inizializzazione Bottoni...");
   // Definiamo i gestori degli eventi
-  redButton.setClickHandler(redButtonSingleClick);
-  redButton.setDoubleClickHandler(redButtonDoubleClick);
-  redButton.setLongClickHandler(redButtonLongClick);
+  redButton.begin(RED_BUTTON_PIN);
+  redButton.setClickHandler(redButtonHandler);
+  //button.setLongClickHandler(handler);       // this will only be called upon release
+  redButton.setLongClickDetectedHandler(redButtonHandler);  // this will only be called upon detection
+  redButton.setDoubleClickHandler(redButtonHandler);
+  redButton.setTripleClickHandler(redButtonHandler);
 
-  greenButton.setClickHandler(greenButtonSingleClick);
-  greenButton.setDoubleClickHandler(greenButtonDoubleClick);
-  greenButton.setLongClickHandler(greenButtonLongClick);
+  greenButton.begin(GREEN_BUTTON_PIN);
+  greenButton.setClickHandler(greenButtonHandler);
+  //button.setLongClickHandler(handler);       // this will only be called upon release
+  greenButton.setLongClickDetectedHandler(greenButtonHandler);  // this will only be called upon detection
+  greenButton.setDoubleClickHandler(greenButtonHandler);
+  greenButton.setTripleClickHandler(greenButtonHandler);
 
   
-  playFileInFolder(MISC_FOLDER, POWER_UP_TRACK);
+  playFileInFolder(MISC_FOLDER, POWER_UP_TRACK, 5000);
 
   delay(5000);
 
@@ -127,8 +206,12 @@ void eraseEEPROM()
   Serial.println("EEPROM cancellata.");
 }
 
-void loop() {
+void loop() 
+{
 
+  redButton.loop();
+  greenButton.loop();
+  
   if(mp3.available())
   {
     // Normale lettura tag RFID per cambiare brano
@@ -154,7 +237,7 @@ void loop() {
       {
         Serial.print("Tag riconosciuto, ID: ");
         Serial.println(id);
-        playFileInFolder(MISC_FOLDER, RECOGNIZED_CHARACTER_TRACK);
+        playFileInFolder(MISC_FOLDER, RECOGNIZED_CHARACTER_TRACK, 5000);
       }
       else 
       {
@@ -164,12 +247,12 @@ void loop() {
         {
           Serial.print("Nuovo tag registrato, ID: ");
           Serial.println(id);
-          playFileInFolder(MISC_FOLDER, NEW_CHARACTER_TRACK);
+          playFileInFolder(MISC_FOLDER, NEW_CHARACTER_TRACK, 5000);
         } 
         else 
         {
           Serial.println("Memoria piena o errore");
-          playFileInFolder(MISC_FOLDER, MEMORY_ERROR_TRACK);
+          playFileInFolder(MISC_FOLDER, MEMORY_ERROR_TRACK, 5000);
         }
       
       }
@@ -179,7 +262,7 @@ void loop() {
       if (id > 0) 
       {
         if(id != currentTrack)
-        {
+        {       
           Serial.print("Tag riconosciuto → Play brano ");
           Serial.println(id);
           mp3.play(id);
@@ -196,14 +279,23 @@ void loop() {
 
 }
 
-void playFileInFolder(uint8_t folder, uint8_t file) 
+
+void playFileInFolder(uint8_t folder, uint8_t file, uint16_t wait) 
 { 
   if (mp3.available()) 
   {
     mp3.sendCommand(0x0F, folder, file);
-    delay(5000);
+    Serial.print("Inizio messaggio -> ");
+    Serial.print("Cartella: ");
+    Serial.print(folder);
+    Serial.print(" File: ");
+    Serial.println(file);
+    delay(wait);
+    Serial.println("Fine messaggio");
   }
 }
+
+
 
 
 int findTag(byte* uid) {
